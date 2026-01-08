@@ -322,3 +322,126 @@ disk.img → The file representing the VM’s virtual disk when the PVC is files
 CDI is like a disk factory:
 
 You order a “disk” (DV) → CDI formats it, creates the disk.img if needed, and makes sure it’s ready for the VM to use.
+###############################################################################
+In the “From URL” option, raw format means a raw disk image—a byte-for-byte representation of a disk, with no compression, no metadata, and no snapshots.
+
+What a raw disk image is
+
+  - It’s an exact copy of a block device (like /dev/sda), sector by sector.
+  - The file contains:
+
+    - Partition table (MBR/GPT)
+    - Filesystems
+    - Bootloader (if present)
+
+- The file size is typically equal to the virtual disk size.
+
+Example:
+
+  - A 20 GB virtual disk → disk.img is ~20 GB
+
+How it differs from qcow2
+```
+Raw	                        qcow2
+Plain bytes, no structure	  Has metadata
+No compression	            Supports compression
+No snapshots	              Supports snapshots
+Fast, simple	              Space-efficient, flexible
+Large file size	            Smaller, grows on demand
+```
+OpenShift Virtualization supports raw and qcow2 for URL imports.
+
+  - Common raw image names
+    - disk.img
+    - disk.raw
+    - image.dd
+    - Sometimes just no extension at all
+
+(Extensions don’t actually matter—the format does.)
+
+How to tell if an image is raw
+
+  - If you have access to the file:
+```
+qemu-img info disk.img
+```
+Output examples:
+
+  - file format: raw ✅
+  - file format: qcow2
+
+Converting to raw (if needed)
+
+  - If your image is qcow2 or another format:
+```
+qemu-img convert -f qcow2 -O raw source.qcow2 disk.img
+```
+
+Then host disk.img on a web server and use that URL in OpenShift.
+
+When raw is commonly used
+
+  - Cloud images exported as raw
+  - Disk images created with dd
+  - Images intended for maximum compatibility and performance
+
+In OpenShift terms
+
+  - When you choose From URL:
+    - OpenShift downloads the raw image
+    - Writes it directly into the PVC
+    - The VM sees it as a normal disk
+    - Changes persist across reboots
+
+If you want, tell me:
+
+- what OS image you’re importing (RHEL, CentOS, Windows, etc.)
+- where the image is coming from
+- …and I can tell you whether it’s already raw, or how to prepare it correctly.
+#####################################################################################################
+Short answer
+
+✅ Raw disks are universally usable by almost all hypervisors
+
+⚠️ qcow2 is native to QEMU/KVM, but not strictly limited to it
+
+Raw disk
+
+  - True statements:
+    - No metadata or features
+    - Just disk bytes
+    - Can be used by:
+      - KVM/QEMU
+      - VMware
+      - Hyper-V
+      - Xen
+      - VirtualBox
+      - OpenShift Virtualization
+
+That’s why raw is considered hypervisor-agnostic.
+
+qcow2 disk
+
+Key facts:
+  - Designed by QEMU
+  - Fully supported by KVM/QEMU
+  - Not a standard format for other hypervisors
+
+Other hypervisors:
+  - Usually do not support qcow2 natively
+  - Can sometimes read it via conversion tools
+  - Commonly require conversion to:
+    - raw
+    - vmdk (VMware)
+    - vhd/vhdx (Hyper-V)
+
+So saying “qcow2 is specific to KVM” is conceptually correct, even if some tools can handle it indirectly.
+
+Practical rule
+  - Raw = portable
+  - qcow2 = QEMU/KVM-centric
+
+One-line takeaway
+  - A raw disk works almost everywhere; qcow2 is optimized for KVM/QEMU and usually needs conversion elsewhere.
+
+Your understanding is solid — this is exactly how infrastructure teams think about disk portability.
